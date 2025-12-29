@@ -3,7 +3,6 @@ TELEGRAM BOT + WEB APP BACKEND
 Production-Ready Educational Games Platform
 """
 
-import os
 import logging
 from datetime import datetime
 from typing import Optional
@@ -21,15 +20,15 @@ from asyncpg.pool import Pool
 # ========================
 # CONFIGURATION
 # ========================
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-WEB_APP_URL = os.getenv("WEB_APP_URL", "https://your-netlify-app.netlify.app")
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/telegram_games")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "123456789").split(",")))
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "")
+BOT_TOKEN = "8541500695:AAECtLNSycfJ1eb8TleOu0MXRhEt-rjE8Wk"
+WEB_APP_URL = "https://earnest-croquembouche-00781f.netlify.app"
+DATABASE_URL = "postgresql://postgres:jQIBmJLVxNraaJWnbvWVXKldgscHbsEP@postgres.railway.internal:5432/railway"
+ADMIN_IDS = [1172284285, 1365319493]
+WEBHOOK_HOST = "https://worker-production-2313.up.railway.app"
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
-API_PORT = int(os.getenv("PORT", 8080))
-SECRET_TOKEN = os.getenv("SECRET_TOKEN", "your-secret-api-token-here")
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+API_PORT = 8080
+SECRET_TOKEN = "my_super_secret_key_13022005"
 
 # ========================
 # LOGGING
@@ -652,10 +651,9 @@ async def get_admin_stats(request):
 @routes.post('/webhook')
 async def webhook_handler(request):
     """Handle Telegram webhook"""
-    if WEBHOOK_URL:
-        update = await request.json()
-        telegram_update = types.Update(**update)
-        await dp.feed_update(bot, telegram_update)
+    update = await request.json()
+    telegram_update = types.Update(**update)
+    await dp.feed_update(bot, telegram_update)
     return web.Response()
 
 # ========================
@@ -665,15 +663,11 @@ async def on_startup(app):
     """Initialize on startup"""
     await init_db()
     
-    if WEBHOOK_URL:
-        await bot.set_webhook(
-            url=WEBHOOK_URL,
-            allowed_updates=dp.resolve_used_update_types()
-        )
-        logger.info(f"Webhook set to {WEBHOOK_URL}")
-    else:
-        await bot.delete_webhook()
-        logger.info("Running in polling mode")
+    await bot.set_webhook(
+        url=WEBHOOK_URL,
+        allowed_updates=dp.resolve_used_update_types()
+    )
+    logger.info(f"Webhook set to {WEBHOOK_URL}")
     
     # Set menu button
     await bot.set_chat_menu_button(
@@ -701,16 +695,8 @@ def main():
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
     
-    if WEBHOOK_URL:
-        # Webhook mode
-        web.run_app(app, host='0.0.0.0', port=API_PORT)
-    else:
-        # Polling mode
-        async def start_polling():
-            await on_startup(None)
-            await dp.start_polling(bot)
-        
-        asyncio.run(start_polling())
+    # Webhook mode
+    web.run_app(app, host='0.0.0.0', port=API_PORT)
 
 if __name__ == '__main__':
     main()
