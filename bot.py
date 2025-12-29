@@ -28,7 +28,7 @@ ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "123456789").split(",")))
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
-API_PORT = int(os.getenv("API_PORT", "8080"))
+API_PORT = int(os.getenv("PORT", 8080))
 SECRET_TOKEN = os.getenv("SECRET_TOKEN", "your-secret-api-token-here")
 
 # ========================
