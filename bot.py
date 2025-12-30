@@ -120,7 +120,10 @@ async def init_db():
                 player_id BIGINT,
                 player_name VARCHAR(255),
                 score INTEGER NOT NULL,
-                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                total INTEGER NOT NULL,
+                percentage INTEGER,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(game_id, player_id)
             )
         """)
         
@@ -665,6 +668,69 @@ async def get_admin_stats(request):
             'total_plays': total_plays,
             'pending_requests': pending_requests
         })
+
+@routes.post('/api/games/{game_id}/score')
+async def save_game_score(request):
+    """Save game score to leaderboard"""
+    if not await verify_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    
+    try:
+        game_id = request.match_info['game_id']
+        data = await request.json()
+        
+        player_id = data.get('player_id')
+        player_name = data.get('player_name')
+        score = data.get('score')
+        total = data.get('total')
+        percentage = data.get('percentage')
+        
+        async with db_pool.acquire() as conn:
+            # Insert or update score (keep best score)
+            await conn.execute("""
+                INSERT INTO game_results (game_id, player_id, player_name, score, total, percentage)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (game_id, player_id) 
+                DO UPDATE SET 
+                    score = GREATEST(game_results.score, $4),
+                    total = $5,
+                    percentage = GREATEST(game_results.percentage, $6),
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE game_results.score < $4
+            """, game_id, player_id, player_name, score, total, percentage)
+        
+        return web.json_response({'success': True})
+    
+    except Exception as e:
+        logger.error(f"Save score error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+@routes.get('/api/games/{game_id}/leaderboard')
+async def get_game_leaderboard(request):
+    """Get leaderboard for a specific game"""
+    game_id = request.match_info['game_id']
+    
+    try:
+        async with db_pool.acquire() as conn:
+            results = await conn.fetch("""
+                SELECT player_name, score, total, percentage, completed_at
+                FROM game_results
+                WHERE game_id = $1
+                ORDER BY percentage DESC, score DESC, completed_at ASC
+                LIMIT 50
+            """, game_id)
+            
+            return web.json_response([{
+                'player_name': r['player_name'],
+                'score': r['score'],
+                'total': r['total'],
+                'percentage': r['percentage'],
+                'completed_at': r['completed_at'].isoformat()
+            } for r in results])
+    
+    except Exception as e:
+        logger.error(f"Leaderboard error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
 
 @routes.post('/webhook')
 async def webhook_handler(request):
